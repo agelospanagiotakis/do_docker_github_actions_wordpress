@@ -1,0 +1,3 @@
+.env
+.secrets/certbot/digitalocean.ini
+extra_logs/letsencrypt/

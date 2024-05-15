@@ -1,0 +1,48 @@
+# /.idea
+# /.vscode
+# /web
+# /vendor
+# /node_modules
+
+# !web/
+# web/*
+# web/wp-content/*
+# !web/wp-content/
+
+# # WP config
+# !web/wp-config.php
+# !web/index.html
+
+# # WP-CFM configuration files
+# !web/wp-content/config/
+
+# # Themes
+# web/wp-content/themes/*
+# !web/wp-content/themes/
+# !web/wp-content/themes/justar-theme
+
+# # Child Theme
+# #!web/wp-content/themes/child
+
+# # Drop ins
+# !web/wp-content/advanced-cache.php
+# !web/wp-content/object-cache.php
+# #!web/wp-content/db.php
+# #!web/wp-content/maintenance.php
+
+# # MU Plugins
+# web/wp-content/mu-plugins/*
+# !web/wp-content/mu-plugins/
+# !web/wp-content/mu-plugins/rkpt-info.php
+# !web/wp-content/mu-plugins/development.php
+
+# # Plugins
+# web/wp-content/plugins/*
+# !web/wp-content/plugins/
+# !web/wp-content/plugins/advanced-custom-fields-pro
+
+# # Translations
+# !web/wp-content/languages/
+
+# # Authentication files
+# !web/google*.html

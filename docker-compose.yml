@@ -1,0 +1,260 @@
+version: '3'
+
+services:
+  db:
+    image: mysql:5.7
+    container_name: "${PROJECT_NAME}_db"
+    volumes:
+      - /mnt/volume_fra1_01/data/db_data:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${DB_NAME}"
+      MYSQL_USER:  "${DB_USER}"
+      MYSQL_PASSWORD: "${DB_PASSWORD}"
+    networks:
+      - internal
+
+  # wordpress:
+  #   ports:
+  #     - "${PORT:-8000}:80"
+  #   depends_on:
+  #     - db
+  #   image: wordpress:latest
+  #   volumes: ["./html:/var/www/html"]
+  #   environment:
+  #     WORDPRESS_DB_HOST: db:3306
+  #     WORDPRESS_DB_USER: root
+  #     WORDPRESS_DB_PASSWORD: password
+  #   networks:
+  #     - web
+  #     - internal
+
+  nginx:
+    restart: unless-stopped
+    image: wodby/nginx:$NGINX_TAG
+    container_name: "${PROJECT_NAME}_nginx"
+    depends_on:
+    - php
+    # - mariadb
+    environment:
+      NGINX_STATIC_OPEN_FILE_CACHE: "off"
+      NGINX_ERROR_LOG_LEVEL: debug
+      NGINX_BACKEND_HOST: php
+      NGINX_SERVER_ROOT: /var/www/html/docroot/web
+      NGINX_VHOST_PRESET: $NGINX_VHOST_PRESET
+    #      NGINX_DRUPAL_FILE_PROXY_URL: http://example.com
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - $PWD/docroot:/var/www/html:cached
+## Alternative for macOS users: Mutagen https://wodby.com/docs/stacks/drupal/local#docker-for-mac
+      - $PWD/certbot-etc:/etc/letsencrypt
+      - $PWD/certbot-var:/var/lib/letsencrypt
+      # - $PWD/nginx.conf:/etc/nginx/nginx.conf
+      # /etc/ssl/cert.pem
+    labels:
+      - "traefik.http.routers.nginx.rule=Host(`www.${DOMAIN}`,`${DOMAIN}`)"
+      - "traefik.http.routers.nginx.entrypoints=https"
+      - "traefik.http.routers.nginx.tls=true"
+      #uncomment for remote certificates
+      # - traefik.http.routers.nginx.tls.certresolver=${CERT_RESOLVER}
+      # - ${CERT_RESOLVER:+traefik.http.routers.nginx.tls.certresolver=${CERT_RESOLVER}}
+      # - "traefik.http.routers.nginx.service=api@internal"
+    networks:
+      - internal
+      - web
+
+  php:
+    restart: unless-stopped
+    image: wodby/wordpress-php:$PHP_TAG
+    container_name: "${PROJECT_NAME}_php"
+    networks:
+      - internal
+      - web
+    environment:
+      PHP_EXTENSIONS_DISABLE: xhprof,spx
+      PHP_MAIL_MIXED_LF_AND_CRLF: "On"
+      # Mailhog:
+      MSMTP_HOST: mailhog
+      MSMTP_PORT: 1025
+#      # OpenSMTPD:
+#      MSMTP_HOST: opensmtpd
+#      MSMTP_PORT: 25
+      DB_HOST: $DB_HOST
+      DB_PORT: $DB_PORT
+      DB_USER: $DB_USER
+      DB_PASSWORD: $DB_PASSWORD
+      DB_NAME: $DB_NAME
+      DB_DRIVER: $DB_DRIVER
+      PHP_XDEBUG_CLIENT_PORT: 9000
+      SSMTP_MAILHUB: mailhog:1025
+      # SSMTP_MAILHUB: opensmtpd:25
+      PHP_SENDMAIL_PATH: '"/usr/bin/dos2unix -u | /usr/sbin/ssmtp -t -f"'
+      # DB_USER: wordpress
+      # DB_PASSWORD: wordpress
+      # DB_ROOT_PASSWORD: admin123
+      # DB_NAME: wordpress
+      # DB_DRIVER: mysql
+      DEBUG: 1
+      DOCROOT_SUBDIR: "web"
+      #WODBY_APP_NAME: ${PROJECT_NAME}
+      #BASE_URL: https://${PROJECT_BASE_URL}
+      WP_VERSION: 5
+      WP_AUTH_KEY: wp-auth-key
+      WP_AUTH_SALT: wp-auth-salt
+      WP_SECURE_AUTH_KEY: wp-secure-auth-key
+      WP_SECURE_AUTH_SALT: wp-secure-auth-salt
+      WP_LOGGED_IN_KEY: wp-logged-in-key
+      WP_LOGGED_IN_SALT: wp-logged-in-salt
+      WP_NONCE_KEY: wp-nonce-key
+      WP_NONCE_SALT: wp-nonce-salt
+      WP_TABLE_PREFIX: wp_
+      WP_DEBUG: 0
+      REDIS_HOST: redis
+      REDIS_PASSWORD: redis
+      REDIS_PORT: "6379"
+      PHP_EXTRA_CONFIGURE_ARGS: "--enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --disable-cgi"
+      COLUMNS: 80 # Set 80 columns for docker exec -it.
+      HTTP_ROOT: /var/www/html/docroot/web
+      APP_ROOT: /var/www/html
+      CONF_DIR: /var/www/conf
+      PHP_FPM_USER: "wodby"
+      PHP_FPM_GROUP: "wodby"
+      WODBY_HOSTS: '["${PROJECT_BASE_URL}"]'
+      WODBY_PRIMARY_HOST: "$PROJECT_BASE_URL"
+    #labels:
+      #- "traefik.http.routers.php.rule=Host(`${PROJECT_BASE_URL}`)"
+      #- "traefik.http.routers.php.tls=true"
+      #- "traefik.http.routers.php.tls.certresolver=${CERT_RESOLVER}"
+      # - ${CERT_RESOLVER:+"traefik.http.routers.php.tls.certresolver=${CERT_RESOLVER}}"
+      #- "traefik.http.services.php.loadbalancer.server.port=80"
+      #- "traefik.port=80"
+    volumes:
+      - $PWD/docroot:/var/www/html:cached
+      #- codebase:/var/www/html # mutagen-sync
+      #- files:/mnt/files/ # Docker volume sync
+
+  # traefik:
+  #   restart: unless-stopped
+  #   container_name: "${PROJECT_NAME}_traefik"
+  #   image: traefik:v2.2
+  #   # command: -c /dev/null --web --docker --logLevel=INFO --defaultEntryPoints='https' --entryPoints="Name:https Address::443 TLS:/certs/cert.pem,/certs/key.pem" --entryPoints="Name:http Address::80 Redirect.EntryPoint:https"
+  #   environment: 
+  #     ENV_PROJECT_BASE_URL: '["${PROJECT_BASE_URL}"]'
+  #   volumes:
+  #       - /var/run/docker.sock:/var/run/docker.sock
+  #       - $PWD/traefik.yml:/traefik.yml
+  #       - $PWD/traefik_dynamic.yml:/traefik_dynamic.yml
+  #       - $PWD/acme.json:/acme.json
+  #   ports:
+  #       - 80:80
+  #       - 443:443
+  #   networks:
+  #       - web
+
+  whoami:
+    image: "traefik/whoami"
+    container_name: "${PROJECT_NAME}_whoami"
+    labels:
+      - traefik.enable=${TRAEFIK_ENABLED}
+      - traefik.http.routers.whoami.tls=true
+      # uncomment for remote certificates
+      #- "traefik.http.routers.whoami.tls.certresolver=${CERT_RESOLVER}"
+      # - ${CERT_RESOLVER:+traefik.http.routers.whoami.tls.certresolver=${CERT_RESOLVER}}
+      - traefik.http.routers.whoami.entrypoints=https
+      - traefik.http.routers.whoami.rule=Host(`whoami.${DOMAIN}`)
+    ports:
+      - 81:80
+    networks:
+      - web
+        
+  traefik:
+    image: traefik:2.4.8
+    container_name: "${PROJECT_NAME}_traefik"
+    restart: unless-stopped
+    environment: 
+      DOMAIN: "${DOMAIN}"
+      ENV_PROJECT_BASE_URL: '["${DOMAIN}"]'
+      DO_AUTH_TOKEN: ${DO_AUTH_TOKEN}
+      TRAEFIK_USER: ${TRAEFIK_USER}
+      TRAEFIK_PASSWORD_HASH: ${TRAEFIK_PASSWORD_HASH}
+    command: 
+      - "--log.level=DEBUG"
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--api.insecure=true" # Don't do that in production
+      # Try to enable this if something isn't working. 
+      # Chances are, Traefik will tell you why.
+      # Be careful in production as it exposes the traffic you might not want to expose.
+      - --entrypoints.http.address=:80
+      - --entrypoints.https.address=:443
+      - --providers.docker=true
+      # LetsEncrypt Staging Server - uncomment when testing
+      # - --certificatesResolvers.letsencrypt.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http
+      - --certificatesresolvers.letsencrypt.acme.email=${EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+    # command:
+    #   - -c /dev/null 
+    #   - --web 
+    #   - --docker 
+    #   - --logLevel=DEBUG 
+    #   - --defaultEntryPoints='https' 
+    #   - --entryPoints="Name:https Address::443 TLS:/certs/crt.txt,/certs/key.txt" 
+    #   - --entryPoints="Name:http Address::80"
+    labels:
+      # Redirect all HTTP traffic to HTTPS
+      - traefik.http.routers.to-https.rule=HostRegexp(`{host:.+}`)
+      - traefik.http.routers.to-https.entrypoints=http
+      - traefik.http.routers.to-https.middlewares=to-https
+      - traefik.http.routers.traefik.rule=Host(`monitor.${DOMAIN}`)
+      - traefik.http.routers.traefik.entrypoints=https
+      - traefik.http.routers.traefik.middlewares=auth
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.routers.traefik.tls=true
+      # uncomment for remote certificates
+      #- "traefik.http.routers.traefik.tls.certresolver=${CERT_RESOLVER}"
+      # - ${CERT_RESOLVER:+traefik.http.routers.traefik.tls.certresolver=${CERT_RESOLVER}}
+      - traefik.http.middlewares.to-https.redirectscheme.scheme=https
+      - 'traefik.http.middlewares.auth.basicauth.users=agelos:$$2y$$05$$9heT3Ja/9cGipv2/WfXg4uj1LQyb7vUqAsiEP7L5p2PB.DlG4B8aW,${TRAEFIK_USER}:${TRAEFIK_PASSWORD_HASH}'
+      #- traefik.http.middlewares.auth.basicauth.users=admin:$$2a$$12$$xGvwiQ4KH3plT9r9izgeOOGtvCA6WUsb9uV1P8/6imXsnZLEJLCHm
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /mnt/volume_fra1_01/data/letsencrypt:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - $PWD/traefik.yml:/traefik.yml
+      - $PWD/traefik_dynamic.yml:/etc/traefik/traefik_dynamic.yml
+      - $PWD/local_certs:/certs/     # per cbeier at https://github.com/wodby/docker4drupal/issues/50
+      #- $PWD/acme.json:/acme.json
+    networks:
+      - web
+        
+
+  certbot:
+    #image: certbot/certbot
+    image: certbot/dns-digitalocean
+    container_name: "${PROJECT_NAME}_certbot"
+    volumes:
+      - $PWD/certbot-etc:/etc/letsencrypt
+      - $PWD/certbot-var:/var/lib/letsencrypt
+      - $PWD/docroot:/var/www/html:cached
+      - $PWD/.secrets/certbot/digitalocean.ini:/root/digitalocean.ini
+      - $PWD/extra_logs/letsencrypt/:/var/log/letsencrypt/
+    depends_on:
+      - nginx
+    #command: certonly --webroot --webroot-path=/var/www/html/ --email agelospanagiotakis@gmail.com --agree-tos --no-eff-email --staging -d ${DOMAIN}  -d www.${DOMAIN} 
+    #command: certonly --webroot --webroot-path=/var/www/html --email agelospanagiotakis@gmail.com --agree-tos --no-eff-email --staging -d ${DOMAIN}  -d www.${DOMAIN} 
+    # command: certonly --dns-digitalocean --dns-digitalocean-credentials $PWD/.secrets/certbot/digitalocean.ini --dns-digitalocean-propagation-seconds 60 -d ${DOMAIN} -d www.${DOMAIN}
+    command: certonly --preferred-challenges dns-01 --agree-tos --register-unsafely-without-email --dns-digitalocean --dns-digitalocean-credentials /root/digitalocean.ini --dns-digitalocean-propagation-seconds 60 -d "${DOMAIN}" -d "*.${DOMAIN}"
+
+networks:
+  web:
+    external: true
+  internal:
+    external: false
+
+#volumes:
+  #db_data:

@@ -1,0 +1,71 @@
+{
+  "name": "wodby/wordpress-composer",
+  "description": "Project template for WordPress projects with composer",
+  "type": "project",
+  "license": "GPL-2.0+",
+  "authors": [
+    {
+      "name": "",
+      "role": ""
+    }
+  ],
+  "repositories":[
+    {
+      "type":"composer",
+      "url":"https://wpackagist.org"
+    }
+  ],
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {
+      "composer/installers": true,
+      "drupal-composer/preserve-paths": true,
+      "johnpbloch/wordpress-core-installer": true,
+      "ffraenz/private-composer-installer": true
+    }
+  },
+  "require": {
+    "composer/installers": "^1.2",
+    "drupal-composer/preserve-paths": "^0.1",
+    "johnpbloch/wordpress-core": "6.4.4",
+    "johnpbloch/wordpress-core-installer": "^2.0",
+    "wpackagist-plugin/cache-enabler": "1.8.*",
+    "wpackagist-plugin/duplicate-post": "4.5.*",
+    "wpackagist-plugin/polylang": "3.3.*",
+    "wpackagist-plugin/redis-cache": "2.2.*",
+    "wpackagist-plugin/wordpress-seo": "19.13.*",
+    "wpackagist-plugin/wps-hide-login": "1.9.*",
+    "wpackagist-theme/twentytwentyone": "*"
+  },
+  "extra": {
+    "installer-paths": {
+      "web/wp-content/plugins/{$name}/": ["type:wordpress-plugin"],
+      "web/wp-content/themes/{$name}/": ["type:wordpress-theme"]
+    },
+    "private-composer-installer": {
+      "dotenv-path": ".",
+      "dotenv-name": ".env"
+    },
+    "wordpress-install-dir": "web",
+    "preserve-paths": [
+      "web/wp-config.php",
+      "web/wp-content/uploads",
+      "web/wp-content/config",
+      "web/wp-content/mu-plugins",
+      "web/wp-content/languages",
+      "web/wp-content/themes/justar-theme",
+      "web/wp-content/plugins/advanced-custom-fields-pro",
+      "web/google9912268f09a6a536.html"
+    ]
+  },
+  "scripts": {
+    "post-install-cmd": [
+        "rm -rf web/wp-content/wp-content;"
+    ],
+    "post-update-cmd": [
+      "rm -rf web/wp-content/wp-content;"
+    ]
+  }
+}

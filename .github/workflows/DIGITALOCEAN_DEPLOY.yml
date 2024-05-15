@@ -1,0 +1,47 @@
+name: DIGITALOCEAN_DEPLOY 
+ 
+on: 
+  push:
+    branches: [ master ]
+
+jobs: 
+  Build:
+    runs-on: self-hosted 
+     
+    steps: 
+      - name: Chown user
+        run: |
+          echo ${{ secrets.USERPWD }} | sudo -S chown -f -R $USER:$USER $GITHUB_WORKSPACE | :
+      - uses: actions/checkout@master 
+      - name: Create .env 
+        run: |
+          cp env_remote .env;
+          source .env;
+          echo 'PROJECT_NAME=${{ secrets.PROJECT_NAME }}' >> .env;
+          echo 'PROJECT_BASE_URL=${{ secrets.PROJECT_BASE_URL }}' >> .env;
+          echo 'PROJECT_STAGE_URL=${{ secrets.PROJECT_STAGE_URL }}' >> .env;
+          echo 'PROJECT_PRODUCTION_URL=${{ secrets.PROJECT_PRODUCTION_URL }}' >> .env;
+          echo 'PROJECT_VERSION=${{ secrets.PROJECT_VERSION }}' >> .env;
+          echo 'DB_NAME=${{ secrets.DB_NAME }}' >> .env;
+          echo 'DB_USER=${{ secrets.DB_USER }}' >> .env;
+          echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' >> .env;
+          echo 'DB_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}' >> .env;
+          echo 'DB_HOST=${{ secrets.DB_HOST }}' >> .env;
+          echo 'DOMAIN=${{ secrets.DOMAIN }}' >> .env;
+          echo 'USERPWD=${{ secrets.USERPWD }}' >> .env;
+          echo 'dns_digitalocean_token = ${{ secrets.DO_AUTH_TOKEN }}' > $PWD/.secrets/certbot/digitalocean.ini;
+          
+    
+      - name: Run build - Stop all Docker containers and then UP!
+        run: |
+          #docker network create web;
+          #chmod 600 acme.json;
+          echo ${{ secrets.USERPWD }} | sudo -S chmod -f 600 letsencrypt/acme.json | :;
+          docker stop $(docker ps -a -q);
+          docker-compose up -d;
+
+      - name: Execute composer install inside container
+        run: |
+            source .env
+            docker exec -i "${{ secrets.PROJECT_NAME }}_php" bash -c "cd docroot/;composer install"
+    
